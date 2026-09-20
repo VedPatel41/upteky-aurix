@@ -60,9 +60,7 @@ AURIX/
 │       ├── App.jsx                  # 3-screen state machine & orchestration flow
 │       ├── index.css                # Enterprise design tokens, keyframes, grid background
 │       ├── api/
-│       │   └── api.js               # Centralized client (MOCK toggle + Django REST endpoints)
-│       ├── data/
-│       │   └── mockData.js          # Offline fallback mock data matching API contract
+│       │   └── api.js               # Centralized client (JWT session + Django REST endpoints)
 │       └── components/
 │           ├── StartupSplash.jsx    # 1-second crisp enterprise startup sequence
 │           ├── Header.jsx           # B2B header with animated progress connectors
@@ -208,10 +206,17 @@ python manage.py bootstrap_admin
 
 ---
 
-## 9. Fallback & Demo Safety Mode
+## 9. Automated Testing & Verification
+The platform includes an automated Django test suite covering Authentication, Ingest, Analyzer, Rule Engine, State Guards, Impact Calculation, and Cross-User Data Isolation:
 
-In [frontend/src/api/api.js](frontend/src/api/api.js), the toggle:
-```javascript
-export const MOCK = false;
+```bash
+cd backend
+python manage.py test api
 ```
-runs the frontend against the live Django REST backend. If presenting in an offline environment without Python, setting `MOCK = true` switches the entire application to client-side mock data with realistic latency delays.
+
+All 23 comprehensive test cases run against an isolated test SQLite database to verify:
+* JWT authentication tokens and duplicate signup prevention
+* Strict user ownership and cross-tenant isolation (404/403 guards)
+* Rule engine activation thresholds (R1 > 4h, R2 > 15% stale, R3 < 40% conversion)
+* Atomic database transactions preventing double approvals (HTTP 409)
+* Pure mathematical ROI impact calculations with zero hardcoded values
