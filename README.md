@@ -152,18 +152,37 @@ npm run dev
 
 ---
 
-## 6. REST API Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/api/health` | Service health status | No |
+| `POST` | `/api/auth/signup` | Register new consultant user, returns JWT tokens | No |
+| `POST` | `/api/auth/login` | Authenticate with email/username & password, returns JWT | No |
+| `POST` | `/api/auth/refresh` | Refresh expired access token | No |
+| `GET` | `/api/auth/me` | Fetch authenticated user profile | **Yes (Bearer)** |
+| `POST` | `/api/auth/logout` | Discard tokens & invalidate session | No |
+| `POST` | `/api/seed` | Generates 312 seeded SME leads, evaluates rules, returns `run_id` | **Yes (Bearer)** |
+| `POST` | `/api/upload` | Multipart CSV upload, processes file, returns `run_id` | **Yes (Bearer)** |
+| `GET` | `/api/runs/{id}/metrics` | Returns CRM summary metrics & 5-stage funnel drop-off | **Yes (Bearer)** |
+| `GET` | `/api/runs/{id}/recommendations`| Returns sorted bottleneck rules (HIGH, MEDIUM, LOW) | **Yes (Bearer)** |
+| `POST` | `/api/recommendations/{id}/approve` | Approves recommendation & creates simulated execution | **Yes (Bearer)** |
+| `POST` | `/api/recommendations/{id}/reject` | Marks recommendation as rejected | **Yes (Bearer)** |
+| `GET` | `/api/executions/{id}/impact` | Computes ROI impact, hours saved, and execution audit logs | **Yes (Bearer)** |
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | Service health status |
-| `POST` | `/api/seed` | Generates 312 seeded SME leads, evaluates rules, returns `run_id` |
-| `POST` | `/api/upload` | Multipart CSV upload, processes file, returns `run_id` |
-| `GET` | `/api/runs/{id}/metrics` | Returns CRM summary metrics & 5-stage funnel drop-off |
-| `GET` | `/api/runs/{id}/recommendations`| Returns sorted bottleneck rules (HIGH, MEDIUM, LOW) |
-| `POST` | `/api/recommendations/{id}/approve` | Approves recommendation & creates simulated execution |
-| `POST` | `/api/recommendations/{id}/reject` | Marks recommendation as rejected |
-| `GET` | `/api/executions/{id}/impact` | Computes ROI impact, hours saved, and execution audit logs |
+---
+
+### Local Admin Superuser Bootstrap
+
+To bootstrap or update the local development admin account safely without storing credentials in source files:
+
+```bash
+# Set environment variables
+$env:DJANGO_SUPERUSER_USERNAME="ved"
+$env:DJANGO_SUPERUSER_PASSWORD="<your-secure-password>"
+$env:DJANGO_SUPERUSER_EMAIL="ved@aurix.local"
+
+# Run bootstrap command
+python manage.py bootstrap_admin
+```
 
 ---
 
