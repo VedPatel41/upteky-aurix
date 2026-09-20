@@ -1,10 +1,19 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenRefreshView
 from django.shortcuts import get_object_or_404
+from django.contrib.auth.models import User
 
 from api.models import AnalysisRun, Recommendation, Execution
-from api.serializers import RecommendationSerializer, AnalysisRunSerializer
+from api.serializers import (
+    RecommendationSerializer,
+    AnalysisRunSerializer,
+    UserSerializer,
+    SignupSerializer,
+)
 from api.services.seed import generate_seed_data
 from api.services.analyzer import analyze_leads
 from api.services.rules import evaluate_rules
@@ -13,11 +22,141 @@ from api.services.impact import calculate_execution_impact
 from api.services.ingest import ingest_csv_file
 
 
+# ==============================================================================
+# AUTHENTICATION VIEWS
+# ==============================================================================
+
+class SignupView(APIView):
+    """
+    POST /api/auth/signup
+    Registers a new user and returns JWT credentials.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SignupSerializer(data=request.data)
+        if not serializer.is_valid():
+            errors = serializer.errors
+            first_err = next(iter(errors.values()))
+            err_msg = first_err[0] if isinstance(first_err, list) else str(first_err)
+            return Response({"detail": err_msg, "errors": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "success": True,
+            "message": "Account created successfully.",
+            "user": UserSerializer(user).data,
+            "tokens": {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    """
+    POST /api/auth/login
+    Authenticates user by email or username and returns JWT credentials.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email_or_user = request.data.get("email") or request.data.get("username")
+        password = request.data.get("password")
+
+        if not email_or_user or not password:
+            return Response(
+                {"detail": "Please provide both email/username and password."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        identifier = str(email_or_user).strip()
+        user = (
+            User.objects.filter(email__iexact=identifier).first()
+            or User.objects.filter(username__iexact=identifier).first()
+        )
+
+        if not user or not user.check_password(password):
+            return Response(
+                {"detail": "Invalid credentials. Please verify your email/username and password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "This user account has been deactivated."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            "success": True,
+            "message": "Logged in successfully.",
+            "user": UserSerializer(user).data,
+            "tokens": {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+        }, status=status.HTTP_200_OK)
+
+
+class CurrentUserView(APIView):
+    """
+    GET /api/auth/me
+    Returns current authenticated user details.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response({
+            "user": UserSerializer(request.user).data,
+            "status": "authenticated",
+        })
+
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout
+    Cleans up session and discards tokens.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_token = request.data.get("refresh")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
+        return Response({
+            "status": "logged_out",
+            "message": "Successfully logged out.",
+        }, status=status.HTTP_200_OK)
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+    """
+    POST /api/auth/refresh
+    Refreshes expired access token.
+    """
+    permission_classes = [AllowAny]
+
+
+# ==============================================================================
+# CORE AURIX TELEMETRY & BUSINESS VIEWS
+# ==============================================================================
+
 class HealthCheckView(APIView):
     """
     GET /api/health
     Basic development health check.
     """
+    permission_classes = [AllowAny]
+
     def get(self, request):
         return Response({"status": "ok", "service": "AURIX Django Engine", "version": "1.0.0"})
 
@@ -27,12 +166,15 @@ class SeedView(APIView):
     POST /api/seed
     Generates realistic Indian SME CRM sample dataset, analyzes pipeline, and generates recommendations.
     """
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         try:
             row_count = generate_seed_data(target_count=312)
             analysis = analyze_leads()
 
             run = AnalysisRun.objects.create(
+                user=request.user,
                 dataset_name="sample_crm_export_q1.csv",
                 metrics_json=analysis,
             )
@@ -56,6 +198,8 @@ class UploadView(APIView):
     POST /api/upload
     Accepts CSV file, validates rows, analyzes pipeline, and runs rule engine.
     """
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         if "file" not in request.FILES:
             return Response({"detail": "No file uploaded. Please attach a CSV file under 'file'."}, status=status.HTTP_400_BAD_REQUEST)
@@ -69,6 +213,7 @@ class UploadView(APIView):
             analysis = analyze_leads()
 
             run = AnalysisRun.objects.create(
+                user=request.user,
                 dataset_name=file_obj.name,
                 metrics_json=analysis,
             )
@@ -92,20 +237,25 @@ class UploadView(APIView):
 class RunMetricsView(APIView):
     """
     GET /api/runs/{id}/metrics
-    Returns descriptive metrics and funnel stages for a given analysis run.
+    Returns descriptive metrics and funnel stages for a given analysis run belonging to the user.
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, run_id):
         # Allow special run_id alias like 'run-312-crm' or latest
         if str(run_id).startswith("run-") or not str(run_id).isdigit():
-            run = AnalysisRun.objects.order_by("-id").first()
+            run = AnalysisRun.objects.filter(user=request.user).order_by("-id").first()
             if not run:
-                # Auto-seed if database is fresh
+                # Auto-seed if database is fresh for this user
                 generate_seed_data(312)
                 analysis = analyze_leads()
-                run = AnalysisRun.objects.create(dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
+                run = AnalysisRun.objects.create(user=request.user, dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
                 evaluate_rules(run, analysis)
         else:
-            run = get_object_or_404(AnalysisRun, id=int(run_id))
+            if request.user.is_superuser:
+                run = get_object_or_404(AnalysisRun, id=int(run_id))
+            else:
+                run = get_object_or_404(AnalysisRun, id=int(run_id), user=request.user)
 
         metrics_json = run.metrics_json or {}
         funnel = metrics_json.get("funnel", [])
@@ -134,18 +284,23 @@ class RunRecommendationsView(APIView):
     GET /api/runs/{id}/recommendations
     Returns rule recommendations sorted by severity (HIGH > MEDIUM > LOW).
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, run_id):
         if str(run_id).startswith("run-") or not str(run_id).isdigit():
-            run = AnalysisRun.objects.order_by("-id").first()
+            run = AnalysisRun.objects.filter(user=request.user).order_by("-id").first()
             if not run:
                 generate_seed_data(312)
                 analysis = analyze_leads()
-                run = AnalysisRun.objects.create(dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
+                run = AnalysisRun.objects.create(user=request.user, dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
                 evaluate_rules(run, analysis)
         else:
-            run = get_object_or_404(AnalysisRun, id=int(run_id))
+            if request.user.is_superuser:
+                run = get_object_or_404(AnalysisRun, id=int(run_id))
+            else:
+                run = get_object_or_404(AnalysisRun, id=int(run_id), user=request.user)
 
-        recs = Recommendation.objects.filter(run=run)
+        recs = Recommendation.objects.filter(run=run).select_related("run")
         # Severity ordering
         severity_map = {"high": 0, "medium": 1, "low": 2}
         sorted_recs = sorted(recs, key=lambda r: severity_map.get(r.severity.lower(), 3))
@@ -159,8 +314,13 @@ class ApproveRecommendationView(APIView):
     POST /api/recommendations/{id}/approve
     Approves recommendation and launches simulated workflow execution.
     """
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, rec_id):
-        rec = get_object_or_404(Recommendation, id=rec_id)
+        rec = get_object_or_404(Recommendation.objects.select_related("run"), id=rec_id)
+        if not request.user.is_superuser and rec.run.user and rec.run.user != request.user:
+            return Response({"detail": "Access denied to this recommendation."}, status=status.HTTP_403_FORBIDDEN)
+
         if rec.status == "rejected":
             return Response({"detail": "This recommendation was previously rejected. Please reconsider it first."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -181,8 +341,13 @@ class RejectRecommendationView(APIView):
     POST /api/recommendations/{id}/reject
     Rejects recommendation and sets status to rejected.
     """
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, rec_id):
-        rec = get_object_or_404(Recommendation, id=rec_id)
+        rec = get_object_or_404(Recommendation.objects.select_related("run"), id=rec_id)
+        if not request.user.is_superuser and rec.run.user and rec.run.user != request.user:
+            return Response({"detail": "Access denied to this recommendation."}, status=status.HTTP_403_FORBIDDEN)
+
         rec.status = "rejected"
         rec.save(update_fields=["status"])
 
@@ -198,22 +363,32 @@ class ExecutionImpactView(APIView):
     GET /api/executions/{id}/impact
     Returns quantified ROI metrics and execution audit logs for an execution run.
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request, exec_id):
         try:
             exec_int_id = int(exec_id)
-            execution = Execution.objects.filter(id=exec_int_id).first()
+            qs = Execution.objects.select_related("recommendation__run")
+            if not request.user.is_superuser:
+                qs = qs.filter(recommendation__run__user=request.user)
+            execution = qs.filter(id=exec_int_id).first()
         except (ValueError, TypeError):
             execution = None
 
         if not execution:
-            execution = Execution.objects.order_by("-id").first()
+            qs = Execution.objects.select_related("recommendation__run")
+            if not request.user.is_superuser:
+                qs = qs.filter(recommendation__run__user=request.user)
+            execution = qs.order_by("-id").first()
             if not execution:
-                # Return default calculated impact based on latest recommendation
-                rec = Recommendation.objects.filter(rule_code="R1").last() or Recommendation.objects.first()
+                rec_qs = Recommendation.objects.select_related("run")
+                if not request.user.is_superuser:
+                    rec_qs = rec_qs.filter(run__user=request.user)
+                rec = rec_qs.filter(rule_code="R1").last() or rec_qs.first()
                 if not rec:
                     generate_seed_data(312)
                     analysis = analyze_leads()
-                    run = AnalysisRun.objects.create(dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
+                    run = AnalysisRun.objects.create(user=request.user, dataset_name="sample_crm_export_q1.csv", metrics_json=analysis)
                     evaluate_rules(run, analysis)
                     rec = Recommendation.objects.filter(run=run).first()
                 exec_int_id = execute_recommendation(rec.id)

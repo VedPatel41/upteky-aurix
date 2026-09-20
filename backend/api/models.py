@@ -1,4 +1,5 @@
 from django.db import models
+from django.contrib.auth.models import User
 
 
 class Lead(models.Model):
@@ -16,9 +17,9 @@ class Lead(models.Model):
     source = models.CharField(max_length=100, blank=True)
     value_inr = models.FloatField(default=0.0)
     stage = models.CharField(max_length=50, choices=STAGE_CHOICES, db_index=True)
-    created_at = models.DateTimeField()
-    first_contact_at = models.DateTimeField(null=True, blank=True)
-    last_activity_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(db_index=True)
+    first_contact_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    last_activity_at = models.DateTimeField(null=True, blank=True, db_index=True)
     owner = models.CharField(max_length=100, blank=True)
 
     def __str__(self):
@@ -26,12 +27,14 @@ class Lead(models.Model):
 
 
 class AnalysisRun(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="runs")
     dataset_name = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     metrics_json = models.JSONField(default=dict)
 
     def __str__(self):
-        return f"Run #{self.id} - {self.dataset_name} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
+        owner_str = self.user.username if self.user else "Anonymous"
+        return f"Run #{self.id} ({owner_str}) - {self.dataset_name}"
 
 
 class Recommendation(models.Model):
