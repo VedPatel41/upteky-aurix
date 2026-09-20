@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { RotateCcw, ArrowRight, Check, Sparkles } from "lucide-react";
+import { RotateCcw, ArrowRight, Check, Sparkles, LogOut, User } from "lucide-react";
 import { MOCK } from "../api/api";
 
 /**
@@ -9,8 +9,9 @@ import { MOCK } from "../api/api";
  * - Logo hover micro-interactions (subtle scale, letter-spacing, brightness)
  * - Animated stage progression connectors
  * - Responsive workspace status pills
+ * - User identity and logout action
  */
-export default function Header({ currentScreen, onNavigate, onReset }) {
+export default function Header({ currentScreen, onNavigate, onReset, currentUser, onLogout }) {
   const screens = [
     { id: "analyze", step: "1", label: "Analyze" },
     { id: "findings", step: "2", label: "Findings" },
@@ -112,8 +113,8 @@ export default function Header({ currentScreen, onNavigate, onReset }) {
           })}
         </nav>
 
-        {/* Right Actions: Demo Reset & MOCK Indicator */}
-        <div className="flex items-center gap-2.5">
+        {/* Right Actions: Demo Reset, MOCK Indicator, User Pill & Logout */}
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {currentScreen !== "analyze" && (
             <button
               type="button"
@@ -136,6 +137,32 @@ export default function Header({ currentScreen, onNavigate, onReset }) {
           >
             {MOCK ? "Demo Mock" : "Django API"}
           </div>
+
+          {currentUser && (
+            <div className="flex items-center gap-2 pl-1 border-l border-[#E4E8EE]">
+              <div 
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#F4F7FB] border border-[#E2E8F0] text-[12px] font-semibold text-[#0E1B2B]"
+                title={`Logged in as ${currentUser.email || currentUser.username}`}
+              >
+                <div className="w-5 h-5 rounded-full bg-[#0043CE] text-white flex items-center justify-center text-[10px] font-bold">
+                  {(currentUser.name || currentUser.username || "U")[0].toUpperCase()}
+                </div>
+                <span className="max-w-[100px] truncate hidden md:inline">
+                  {currentUser.name || currentUser.username}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] font-medium text-[#5A6B7B] hover:text-[#D14343] hover:bg-[#FFF2F2] rounded-[4px] border border-[#E4E8EE] hover:border-[#FCD2D2] transition-all cursor-pointer shadow-2xs group"
+                title="Sign out of AURIX"
+              >
+                <LogOut className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

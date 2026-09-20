@@ -10,8 +10,11 @@ import ImpactSummary from "./components/ImpactSummary";
 import ExecutionLog from "./components/ExecutionLog";
 import Toast from "./components/Toast";
 import StartupSplash from "./components/StartupSplash";
+import AuthScreen from "./components/AuthScreen";
 import {
   MOCK,
+  getCurrentUser,
+  logoutUser,
   seedSampleData,
   uploadCrmCsv,
   getRunMetrics,
@@ -30,11 +33,36 @@ import {
 } from "lucide-react";
 
 export default function App() {
+  // Auth state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
+
   // Splash state
   const [showSplash, setShowSplash] = useState(true);
 
   // Screen state: 'analyze' | 'findings' | 'impact'
   const [currentScreen, setCurrentScreen] = useState("analyze");
+
+  // Check active session on startup
+  useEffect(() => {
+    let isMounted = true;
+    async function checkSession() {
+      try {
+        const res = await getCurrentUser();
+        if (isMounted && res?.user) {
+          setCurrentUser(res.user);
+        }
+      } catch {
+        if (isMounted) setCurrentUser(null);
+      } finally {
+        if (isMounted) setAuthChecking(false);
+      }
+    }
+    checkSession();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Analysis stepper state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -73,6 +101,25 @@ export default function App() {
     setErrorMsg("");
     showToast("Workspace reset to initial state", "info");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Auth Handlers
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+    showToast(`Welcome back, ${user.name || user.username}!`);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // Non-fatal if offline
+    }
+    setCurrentUser(null);
+    setCurrentScreen("analyze");
+    setIsAnalyzing(false);
+    setCardStates({});
+    showToast("Successfully signed out of AURIX", "info");
   };
 
   // Step 1: Start Analysis (Sample CRM data or custom file)
@@ -212,11 +259,43 @@ export default function App() {
 
   const hasApprovedAny = Object.values(cardStates).some((s) => s.isApproved);
 
+  // 1. Session verification loading state
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#F7F8FA] flex flex-col items-center justify-center gap-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[#0043CE] border-t-transparent animate-spin" />
+        <span className="text-[13px] font-semibold text-[#5A6B7B] tracking-wide">
+          Verifying AURIX Session...
+        </span>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated state: Render enterprise Login/Signup Screen
+  if (!currentUser) {
+    return (
+      <>
+        {showSplash && <StartupSplash onComplete={() => setShowSplash(false)} />}
+        <AuthScreen onAuthSuccess={handleAuthSuccess} />
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </>
+    );
+  }
+
+  // 3. Authenticated Workspace Canvas
   return (
     <div className="min-h-screen bg-[#F7F8FA] text-[#0E1B2B] flex flex-col font-sans selection:bg-[#0E1B2B] selection:text-white animate-app-entrance">
-      {/* Top Application Header */}
+      {/* Top Application Header with User Identity and Logout */}
       <Header
         currentScreen={currentScreen}
+        currentUser={currentUser}
+        onLogout={handleLogout}
         onNavigate={(screenId) => {
           if (screenId === "analyze") setCurrentScreen("analyze");
           if (screenId === "findings" && (metrics || currentScreen === "impact"))
