@@ -13,12 +13,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         username = options["username"] or os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
-        password = options["password"] or os.environ.get("DJANGO_SUPERUSER_PASSWORD")
-        email = options["email"] or os.environ.get("DJANGO_SUPERUSER_EMAIL", f"{username}@aurix.local")
-
-        if not password:
-            self.stderr.write(self.style.ERROR("Error: Password must be provided via --password or DJANGO_SUPERUSER_PASSWORD."))
-            return
+        password = options["password"] or os.environ.get("DJANGO_SUPERUSER_PASSWORD", "password123")
+        email = options["email"] or os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@aurix.ai")
 
         user, created = User.objects.get_or_create(username=username, defaults={"email": email})
         user.is_staff = True
