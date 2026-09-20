@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { ArrowRight, CheckCircle2, XCircle, Zap, ShieldAlert, Sparkles, Check, ArrowUpRight } from "lucide-react";
+import { ArrowRight, CheckCircle2, XCircle, Zap, ShieldAlert, Sparkles, Check, ArrowUpRight, RotateCcw } from "lucide-react";
 
 /**
  * FindingCard Component (Screen 2: Findings)
  * Reusable recommendation card highlighting severity, before->target metric, and execution state.
+ * Features subtle hover lift, smooth approval state sequence, and reject/reconsider flow.
  */
 export default function FindingCard({
   finding,
@@ -13,8 +14,6 @@ export default function FindingCard({
   onViewImpact,
   executionState, // { isRunning: boolean, isApproved: boolean, isRejected: boolean }
 }) {
-  const [rejectReasonOpen, setRejectReasonOpen] = useState(false);
-
   // Severity styles
   const getSeverityBadge = () => {
     switch (finding.severity?.toLowerCase()) {
@@ -50,18 +49,18 @@ export default function FindingCard({
   const isRunning = executionState?.isRunning;
   const isRejected = executionState?.isRejected;
 
-  // Stagger animation style
-  const animationDelay = `${index * 80}ms`;
+  // Stagger animation delay: 240ms base + index * 80ms
+  const animationDelay = `${240 + index * 80}ms`;
 
   return (
     <div
       style={{ animationDelay }}
       className={`aurix-card bg-white border rounded-[6px] p-5 transition-all duration-200 animate-card-reveal ${
         isApproved
-          ? "border-[#1F9D6B] bg-[#FAFCFB] ring-1 ring-[#1F9D6B]/30"
+          ? "border-[#1F9D6B] bg-[#FAFCFB] ring-1 ring-[#1F9D6B]/30 shadow-2xs"
           : isRejected
-          ? "border-[#E4E8EE] bg-[#F7F8FA] opacity-60"
-          : "border-[#E4E8EE] hover:border-[#CBD5E1]"
+          ? "border-[#E4E8EE] bg-[#F7F8FA] opacity-65"
+          : "border-[#E4E8EE] hover:border-[#CBD5E1] hover:-translate-y-0.5 hover:shadow-2xs"
       }`}
     >
       {/* 1. Header: Severity + Rule Code */}
@@ -94,7 +93,7 @@ export default function FindingCard({
       </div>
 
       {/* 3. Metric Comparison Box (Before -> Target) */}
-      <div className="p-3 bg-[#F7F8FA] rounded-[4px] border border-[#E8ECF2] mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-3.5 bg-[#F7F8FA] rounded-[4px] border border-[#E8ECF2] mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
         <div>
           <span className="text-[11px] font-medium text-[#5A6B7B] uppercase tracking-wide">
             Response Time Metric
@@ -107,7 +106,7 @@ export default function FindingCard({
             <span className="text-[15px] font-semibold text-[#1F9D6B] tabular-nums">
               {finding.metric_after_target} {finding.metric_unit}
             </span>
-            <span className="text-[11px] font-medium text-[#1F9D6B] ml-1 bg-[#E6F6EE] px-1.5 py-0.5 rounded-[3px]">
+            <span className="text-[11px] font-medium text-[#1F9D6B] ml-1 bg-[#E6F6EE] px-1.5 py-0.5 rounded-[3px] border border-[#C3EBD6]">
               -89% latency
             </span>
           </div>
@@ -125,13 +124,13 @@ export default function FindingCard({
 
       {/* 4. Action / Execution State Transition */}
       {isRunning && (
-        <div className="p-3.5 bg-[#F4F7FB] border border-[#D0E2FF] rounded-[4px]">
+        <div className="p-3.5 bg-[#F4F7FB] border border-[#D0E2FF] rounded-[4px] animate-card-reveal">
           <div className="flex items-center justify-between text-[13px] font-medium text-[#0043CE] mb-2">
             <span className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#0043CE] animate-pulse" />
               Running automation...
             </span>
-            <span className="text-[11px] text-[#5A6B7B]">Simulating 112 hooks</span>
+            <span className="text-[11px] text-[#5A6B7B]">Simulating 112 webhook dispatches</span>
           </div>
           {/* Small Indeterminate Progress Bar */}
           <div className="w-full h-1.5 bg-[#DCE6F2] rounded-full overflow-hidden relative">
@@ -141,9 +140,11 @@ export default function FindingCard({
       )}
 
       {isApproved && !isRunning && (
-        <div className="p-3.5 bg-[#E6F6EE] border border-[#C3EBD6] rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-3.5 bg-[#E6F6EE] border border-[#C3EBD6] rounded-[4px] flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-card-reveal">
           <div className="flex items-start gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-[#1F9D6B] shrink-0 mt-0.5" />
+            <div className="animate-checkmark-pop">
+              <CheckCircle2 className="w-5 h-5 text-[#1F9D6B] shrink-0 mt-0.5" />
+            </div>
             <div>
               <div className="text-[13px] font-semibold text-[#0E1B2B]">
                 Approved · {finding.affected_count} actions queued
@@ -157,16 +158,16 @@ export default function FindingCard({
           <button
             type="button"
             onClick={onViewImpact}
-            className="px-3.5 py-2 bg-[#1F9D6B] hover:bg-[#198459] text-white text-[13px] font-medium rounded-[4px] transition flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+            className="group aurix-btn px-3.5 py-2 bg-[#1F9D6B] hover:bg-[#198459] text-white text-[13px] font-medium rounded-[4px] transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
           >
             <span>View Impact</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="w-3.5 h-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </button>
         </div>
       )}
 
       {isRejected && (
-        <div className="p-3 bg-[#F0F3F7] border border-[#E4E8EE] rounded-[4px] flex items-center justify-between text-[13px] text-[#5A6B7B]">
+        <div className="p-3 bg-[#F0F3F7] border border-[#E4E8EE] rounded-[4px] flex items-center justify-between text-[13px] text-[#5A6B7B] animate-card-reveal">
           <div className="flex items-center gap-2">
             <XCircle className="w-4 h-4 text-[#8A9BA8]" />
             <span>Recommendation rejected</span>
@@ -174,9 +175,10 @@ export default function FindingCard({
           <button
             type="button"
             onClick={() => onApproveClick(finding)}
-            className="text-[12px] text-[#0043CE] hover:underline cursor-pointer"
+            className="group flex items-center gap-1 text-[12px] text-[#0043CE] hover:underline cursor-pointer font-medium"
           >
-            Reconsider
+            <RotateCcw className="w-3 h-3 transition-transform group-hover:-rotate-45" />
+            <span>Reconsider</span>
           </button>
         </div>
       )}
@@ -186,16 +188,16 @@ export default function FindingCard({
           <button
             type="button"
             onClick={() => onRejectClick(finding)}
-            className="px-3 py-1.5 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] hover:bg-[#F0F3F7] rounded-[4px] border border-transparent hover:border-[#E4E8EE] transition cursor-pointer"
+            className="aurix-btn px-3.5 py-1.5 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] hover:bg-[#F0F3F7] rounded-[4px] border border-transparent hover:border-[#E4E8EE] transition cursor-pointer"
           >
             Reject
           </button>
           <button
             type="button"
             onClick={() => onApproveClick(finding)}
-            className="px-4 py-1.5 bg-[#0E1B2B] hover:bg-[#1E2E42] text-white text-[13px] font-medium rounded-[4px] shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            className="group aurix-btn px-4 py-1.5 bg-[#0E1B2B] hover:bg-[#1E2E42] active:bg-black text-white text-[13px] font-medium rounded-[4px] shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-3.5 h-3.5 transition-transform duration-150 group-hover:scale-110" />
             <span>Approve</span>
           </button>
         </div>

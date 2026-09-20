@@ -18,6 +18,15 @@
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    position: relative;
+    /* Subtle enterprise background texture: quiet radial highlights + delicate 24px dot grid */
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(31, 157, 107, 0.035) 0%, transparent 45%),
+      radial-gradient(circle at 85% 20%, rgba(0, 67, 206, 0.025) 0%, transparent 40%),
+      radial-gradient(#D5DCE5 0.75px, transparent 0.75px);
+    background-size: 100% 100%, 100% 100%, 24px 24px;
+    background-attachment: fixed;
   }
 }
 
@@ -31,36 +40,224 @@
   border: 1px solid #E4E8EE;
   border-radius: 6px;
   padding: 20px;
+  transition: transform 180ms cubic-bezier(0.2, 0.7, 0.3, 1),
+              box-shadow 180ms cubic-bezier(0.2, 0.7, 0.3, 1),
+              border-color 180ms ease,
+              background-color 180ms ease;
 }
 
-/* Button base styling */
+/* High-end interactive Card Hover */
+.aurix-card-hover {
+  cursor: default;
+}
+
+.aurix-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: #CBD5E1;
+  box-shadow: 0 8px 24px -4px rgba(14, 27, 43, 0.06), 0 2px 6px -1px rgba(14, 27, 43, 0.03);
+}
+
+.aurix-card-hover:active {
+  transform: translateY(-1px);
+}
+
+/* Button micro-interactions */
 .aurix-btn {
   border-radius: 4px;
   font-weight: 500;
   font-size: 14px;
-  transition: all 150ms ease;
+  transition: transform 140ms cubic-bezier(0.2, 0.7, 0.3, 1),
+              background-color 140ms ease,
+              border-color 140ms ease,
+              box-shadow 140ms ease,
+              opacity 140ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
 }
 
-/* Animation A2: Findings reveal stagger */
-@keyframes cardReveal {
-  from {
+.aurix-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.03);
+}
+
+.aurix-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.aurix-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 4px #0E1B2B;
+}
+
+/* Global screen transition */
+@keyframes screenEnter {
+  0% {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px) scale(0.995);
   }
-  to {
+  100% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-screen-enter {
+  animation: screenEnter 280ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* App startup entrance animation */
+@keyframes introReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.01) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-intro-reveal {
+  animation: introReveal 650ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* Staggered item reveal */
+@keyframes itemReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
 .animate-card-reveal {
-  animation: cardReveal 220ms ease-out forwards;
+  animation: itemReveal 260ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 
-/* Indeterminate progress bar for Approve transition */
+/* Checkmark entrance pop */
+@keyframes checkmarkPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  70% {
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-checkmark-pop {
+  animation: checkmarkPop 260ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Modal dialog entrance */
+@keyframes modalEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-enter {
+  animation: modalEnter 240ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* Modal backdrop fade */
+@keyframes backdropFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-backdrop-fade {
+  animation: backdropFade 180ms ease-out forwards;
+}
+
+/* Dropzone idle breathing */
+@keyframes dropzoneBreathe {
+  0%, 100% {
+    border-color: #D7DFE9;
+    background-color: #FAFBFC;
+  }
+  50% {
+    border-color: #BCC8D8;
+    background-color: #F8FAFD;
+  }
+}
+
+.animate-dropzone-breathe {
+  animation: dropzoneBreathe 4s infinite ease-in-out;
+}
+
+/* Dropzone active drag pulse */
+@keyframes dragPulse {
+  0%, 100% {
+    border-color: #0E1B2B;
+    background-color: #F0F4FA;
+    transform: scale(1.005);
+  }
+  50% {
+    border-color: #0043CE;
+    background-color: #E8F0FE;
+    transform: scale(1.01);
+  }
+}
+
+.animate-drag-pulse {
+  animation: dragPulse 1.2s infinite ease-in-out;
+}
+
+/* Number finish celebration pulse */
+@keyframes numberPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-number-pop {
+  animation: numberPop 300ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* High severity badge 2-cycle initial pulse */
+@keyframes severityPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(209, 67, 67, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(209, 67, 67, 0.15);
+  }
+}
+
+.animate-severity-pulse {
+  animation: severityPulse 1.4s 2 ease-in-out;
+}
+
+/* Indeterminate progress bar */
 @keyframes indeterminate {
   0% {
     transform: translateX(-100%);
@@ -77,24 +274,60 @@
   animation: indeterminate 1.2s infinite ease-in-out;
 }
 
-/* Stepper pulse */
-@keyframes subtlePulse {
-  0%, 100% {
+/* Scanning data pulse across active stepper */
+@keyframes scanBeam {
+  0% {
+    left: -30%;
+  }
+  100% {
+    left: 130%;
+  }
+}
+
+.animate-scan-beam {
+  animation: scanBeam 1.5s infinite linear;
+}
+
+/* Toast entrance and exit */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.95);
+  }
+  to {
     opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
+    transform: translateY(0) scale(1);
   }
 }
 
-.animate-subtle-pulse {
-  animation: subtlePulse 1.2s infinite ease-in-out;
+.animate-toast-enter {
+  animation: toastSlideIn 250ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 
-/* Accessibility: respect reduced motion */
+/* Tooltip micro-entrance */
+@keyframes tooltipEnter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-tooltip {
+  animation: tooltipEnter 150ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* Accessibility: respect user preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

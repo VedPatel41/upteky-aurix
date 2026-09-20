@@ -8,6 +8,8 @@ import FindingCard from "./components/FindingCard";
 import ConfirmDialog from "./components/ConfirmDialog";
 import ImpactSummary from "./components/ImpactSummary";
 import ExecutionLog from "./components/ExecutionLog";
+import Toast from "./components/Toast";
+import StartupSplash from "./components/StartupSplash";
 import {
   MOCK,
   seedSampleData,
@@ -24,12 +26,13 @@ import {
   Target,
   AlertOctagon,
   ArrowRight,
-  Sparkles,
   AlertCircle,
-  CheckCircle2,
 } from "lucide-react";
 
 export default function App() {
+  // Splash state
+  const [showSplash, setShowSplash] = useState(true);
+
   // Screen state: 'analyze' | 'findings' | 'impact'
   const [currentScreen, setCurrentScreen] = useState("analyze");
 
@@ -51,8 +54,15 @@ export default function App() {
   // Confirmation modal state
   const [activeConfirmRec, setActiveConfirmRec] = useState(null);
 
+  // Toast feedback state
+  const [toast, setToast] = useState(null); // { message, type }
+
   // Error handling state
   const [errorMsg, setErrorMsg] = useState("");
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+  };
 
   // Initial load or reset
   const resetAnalysis = () => {
@@ -61,6 +71,8 @@ export default function App() {
     setCardStates({});
     setActiveConfirmRec(null);
     setErrorMsg("");
+    showToast("Workspace reset to initial state", "info");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Step 1: Start Analysis (Sample CRM data or custom file)
@@ -74,11 +86,13 @@ export default function App() {
         const uploadRes = await uploadCrmCsv(file);
         if (uploadRes?.run_id) {
           setRunId(uploadRes.run_id);
+          showToast(`File "${file.name}" uploaded successfully`);
         }
       } else {
         const seedRes = await seedSampleData();
         if (seedRes?.run_id) {
           setRunId(seedRes.run_id);
+          showToast("Sample CRM dataset loaded (312 leads)");
         }
       }
     } catch (err) {
@@ -91,7 +105,6 @@ export default function App() {
   // Triggered when 4-step analysis pipeline completes (~2.2s)
   const handleStepperComplete = async () => {
     try {
-      // Fetch metrics and recommendations
       const [metricsRes, recsRes] = await Promise.all([
         getRunMetrics(runId),
         getRecommendations(runId),
@@ -102,6 +115,7 @@ export default function App() {
       setRecommendations(recsRes.recommendations);
       setIsAnalyzing(false);
       setCurrentScreen("findings");
+      showToast("Diagnostic analysis completed · 3 opportunities found");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("Findings load error:", err);
@@ -126,10 +140,9 @@ export default function App() {
     }));
 
     try {
-      // Call approve API
       const approveRes = await approveRecommendation(rec.id);
 
-      // Simulate the 1.2s orchestration execution delay requested in section 20
+      // Simulate 1.2s orchestration execution delay
       setTimeout(async () => {
         setCardStates((prev) => ({
           ...prev,
@@ -140,6 +153,8 @@ export default function App() {
             executionId: approveRes?.execution_id || 7,
           },
         }));
+
+        showToast(`Rule ${rec.rule_code} approved · 112 simulated actions queued`);
 
         // Fetch impact results immediately for Screen 3
         try {
@@ -168,6 +183,7 @@ export default function App() {
         ...prev,
         [rec.id]: { isRunning: false, isApproved: false, isRejected: true },
       }));
+      showToast(`Recommendation (Rule ${rec.rule_code}) rejected`, "info");
     } catch (err) {
       console.error("Reject error:", err);
       setErrorMsg(err.message || "Failed to reject recommendation.");
@@ -189,16 +205,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Check if any recommendation has been approved
   const hasApprovedAny = Object.values(cardStates).some((s) => s.isApproved);
 
   return (
-    <div className="min-h-screen bg-[#F7F8FA] text-[#0E1B2B] flex flex-col font-sans selection:bg-[#0E1B2B] selection:text-white">
+    <div className="min-h-screen bg-[#F7F8FA] text-[#0E1B2B] flex flex-col font-sans selection:bg-[#0E1B2B] selection:text-white animate-app-entrance">
       {/* Top Application Header */}
       <Header
         currentScreen={currentScreen}
         onNavigate={(screenId) => {
-          // Allow navigation to screens that have data available
           if (screenId === "analyze") setCurrentScreen("analyze");
           if (screenId === "findings" && (metrics || currentScreen === "impact"))
             setCurrentScreen("findings");
@@ -213,7 +227,7 @@ export default function App() {
       <main className="flex-1 w-full max-w-[1080px] mx-auto px-4 sm:px-6 py-8 sm:py-10">
         {/* Global Error Banner */}
         {errorMsg && (
-          <div className="mb-6 p-4 bg-[#FDE8E8] border border-[#FACDCD] rounded-[6px] flex items-start justify-between gap-3 text-[13px] text-[#D14343]">
+          <div className="mb-6 p-4 bg-[#FDE8E8] border border-[#FACDCD] rounded-[6px] flex items-start justify-between gap-3 text-[13px] text-[#D14343] animate-card-reveal">
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <div>
@@ -224,7 +238,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setErrorMsg("")}
-              className="text-[#D14343] font-bold text-[14px] hover:opacity-75 cursor-pointer"
+              className="text-[#D14343] font-bold text-[14px] hover:opacity-75 cursor-pointer p-1"
             >
               ✕
             </button>
@@ -235,7 +249,7 @@ export default function App() {
             SCREEN 1: ANALYZE
            ======================================================= */}
         {currentScreen === "analyze" && (
-          <div className="py-4">
+          <div className="py-4 animate-screen-enter">
             {!isAnalyzing ? (
               <UploadPanel
                 onStartAnalysis={handleStartAnalysis}
@@ -256,9 +270,9 @@ export default function App() {
             SCREEN 2: FINDINGS
            ======================================================= */}
         {currentScreen === "findings" && (
-          <div className="space-y-8 animate-card-reveal">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E4E8EE] pb-5">
+          <div className="space-y-8 animate-screen-enter">
+            {/* Header (Reveals first) */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E4E8EE] pb-5 animate-card-reveal">
               <div>
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] bg-[#EBF3FF] text-[#0043CE] text-[11px] font-semibold uppercase tracking-wider mb-2">
                   <span>Diagnostic Report</span>
@@ -277,21 +291,22 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleViewImpact()}
-                  className="px-4 py-2 bg-[#1F9D6B] hover:bg-[#198459] text-white text-[13px] font-medium rounded-[4px] shadow-xs transition flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+                  className="group aurix-btn px-4 py-2 bg-[#1F9D6B] hover:bg-[#198459] active:bg-[#146b48] text-white text-[13px] font-medium rounded-[4px] shadow-xs transition-all flex items-center gap-2 self-start sm:self-auto cursor-pointer animate-checkmark-pop"
                 >
                   <span>Review Quantified Impact</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1" />
                 </button>
               )}
             </div>
 
-            {/* 4 Metric Tiles */}
+            {/* 4 Metric Tiles (Staggered reveal with natural count-up) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricTile
                 label="Total Leads"
                 value={metrics?.total_leads || 312}
                 subtext="Records in active pipeline"
                 icon={Users}
+                delay={60}
               />
 
               <MetricTile
@@ -301,6 +316,7 @@ export default function App() {
                 badge="High Latency"
                 badgeType="signal"
                 icon={Clock}
+                delay={100}
               />
 
               <MetricTile
@@ -308,6 +324,7 @@ export default function App() {
                 value={metrics?.qualified_leads || 112}
                 subtext="High-intent opportunity pool"
                 icon={Target}
+                delay={140}
               />
 
               <MetricTile
@@ -317,11 +334,12 @@ export default function App() {
                 badge="Bottleneck"
                 badgeType="danger"
                 icon={AlertOctagon}
+                delay={180}
               />
             </div>
 
-            {/* Funnel / Process Summary */}
-            <ProcessFunnel stages={funnel} />
+            {/* Funnel / Process Summary (Delay 200ms) */}
+            <ProcessFunnel stages={funnel} delay={200} />
 
             {/* Recommendations Section */}
             <div className="space-y-4">
@@ -334,7 +352,7 @@ export default function App() {
                     Ranked by immediate revenue and cycle-time recovery impact.
                   </p>
                 </div>
-                <span className="text-[12px] font-medium text-[#5A6B7B] bg-white border border-[#E4E8EE] px-2.5 py-1 rounded-[4px]">
+                <span className="text-[12px] font-medium text-[#5A6B7B] bg-white border border-[#E4E8EE] px-2.5 py-1 rounded-[4px] shadow-2xs">
                   {recommendations.length} recommendations ready
                 </span>
               </div>
@@ -357,9 +375,9 @@ export default function App() {
 
             {/* Bottom Floating Navigation for Quick Demo Progression */}
             {hasApprovedAny && (
-              <div className="p-4 rounded-[6px] bg-[#0E1B2B] text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+              <div className="p-4 rounded-[6px] bg-[#0E1B2B] text-white flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md animate-card-reveal">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#1F9D6B] text-white flex items-center justify-center font-bold text-[14px]">
+                  <div className="w-8 h-8 rounded-full bg-[#1F9D6B] text-white flex items-center justify-center font-bold text-[14px] animate-checkmark-pop">
                     ✓
                   </div>
                   <div>
@@ -375,10 +393,10 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => handleViewImpact()}
-                  className="w-full sm:w-auto px-5 py-2 bg-[#1F9D6B] hover:bg-[#198459] text-white text-[13px] font-medium rounded-[4px] transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                  className="group aurix-btn w-full sm:w-auto px-5 py-2.5 bg-[#1F9D6B] hover:bg-[#198459] active:bg-[#146b48] text-white text-[13px] font-medium rounded-[4px] transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 shadow-xs"
                 >
                   <span>Proceed to Screen 3: Automation Impact</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-1" />
                 </button>
               </div>
             )}
@@ -389,11 +407,11 @@ export default function App() {
             SCREEN 3: IMPACT
            ======================================================= */}
         {currentScreen === "impact" && (
-          <div className="space-y-8 animate-card-reveal">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E4E8EE] pb-5">
+          <div className="space-y-8 animate-screen-enter">
+            {/* Header (Reveals first) */}
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E4E8EE] pb-5 animate-card-reveal">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] bg-[#E6F6EE] text-[#1F9D6B] text-[11px] font-semibold uppercase tracking-wider mb-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[4px] bg-[#E6F6EE] text-[#1F9D6B] text-[11px] font-semibold uppercase tracking-wider mb-2 border border-[#C3EBD6]">
                   <span>Simulated Outcome</span>
                   <span>•</span>
                   <span>Rule R1 Orchestrated</span>
@@ -410,25 +428,25 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setCurrentScreen("findings")}
-                  className="px-3.5 py-2 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] bg-white border border-[#E4E8EE] rounded-[4px] transition cursor-pointer"
+                  className="aurix-btn px-3.5 py-2 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] bg-white border border-[#E4E8EE] rounded-[4px] transition cursor-pointer"
                 >
                   ← Back to Findings
                 </button>
                 <button
                   type="button"
                   onClick={resetAnalysis}
-                  className="px-4 py-2 bg-[#0E1B2B] hover:bg-[#1E2E42] text-white text-[13px] font-medium rounded-[4px] transition cursor-pointer"
+                  className="aurix-btn px-4 py-2 bg-[#0E1B2B] hover:bg-[#1E2E42] active:bg-black text-white text-[13px] font-medium rounded-[4px] transition cursor-pointer shadow-xs"
                 >
                   New Analysis
                 </button>
               </div>
             </div>
 
-            {/* Impact Summary with 3 Metrics & Before/After Recharts */}
+            {/* Impact Summary: 1. Chart, 2. Metrics, 3. Disclaimer */}
             <ImpactSummary impactData={impactData} />
 
-            {/* Execution Audit Log */}
-            <ExecutionLog logs={executionLogs} />
+            {/* 4. Execution Audit Log (Delay 320ms + progressive row stagger) */}
+            <ExecutionLog logs={executionLogs} delay={320} />
           </div>
         )}
       </main>
@@ -441,6 +459,18 @@ export default function App() {
         onConfirm={handleConfirmApproval}
         isExecuting={false}
       />
+
+      {/* Non-intrusive Feedback Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      {/* 1-Second Enterprise Startup Sequence */}
+      {showSplash && <StartupSplash onComplete={() => setShowSplash(false)} />}
 
       {/* Minimal Footer */}
       <footer className="w-full bg-white border-t border-[#E4E8EE] py-4 mt-auto">

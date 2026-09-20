@@ -5,7 +5,7 @@ import { X, ShieldCheck, ArrowRight, Check } from "lucide-react";
  * ConfirmDialog Component
  *
  * Professional, compact modal for approving automation execution.
- * Displays affected count, proposed action, and before/after target metric.
+ * Features smooth backdrop fade and scale-in entrance.
  */
 export default function ConfirmDialog({
   isOpen,
@@ -22,27 +22,36 @@ export default function ConfirmDialog({
     };
     if (isOpen) {
       window.addEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "hidden";
     }
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "unset";
+    };
   }, [isOpen, isExecuting, onCancel]);
 
   if (!isOpen || !recommendation) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1B2B]/40 backdrop-blur-[2px] transition-opacity">
-      {/* Dialog Card */}
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isExecuting) onCancel();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0E1B2B]/45 backdrop-blur-[2px] animate-backdrop-fade"
+    >
+      {/* Dialog Card with scale-in entrance */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        className="w-full max-w-[460px] bg-white rounded-[6px] border border-[#E4E8EE] shadow-lg p-6 relative animate-card-reveal"
+        className="w-full max-w-[460px] bg-white rounded-[6px] border border-[#E4E8EE] shadow-lg p-6 relative animate-modal-enter"
       >
         {/* Close Button */}
         <button
           type="button"
           onClick={onCancel}
           disabled={isExecuting}
-          className="absolute top-4 right-4 p-1 text-[#8A9BA8] hover:text-[#0E1B2B] rounded transition cursor-pointer disabled:opacity-40"
+          className="absolute top-4 right-4 p-1.5 text-[#8A9BA8] hover:text-[#0E1B2B] hover:bg-[#F0F3F7] rounded transition cursor-pointer disabled:opacity-40"
           aria-label="Close dialog"
         >
           <X className="w-4 h-4" />
@@ -50,7 +59,7 @@ export default function ConfirmDialog({
 
         {/* Dialog Header */}
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-9 h-9 rounded-[4px] bg-[#E6F6EE] text-[#1F9D6B] flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-9 h-9 rounded-[4px] bg-[#E6F6EE] text-[#1F9D6B] flex items-center justify-center shrink-0 mt-0.5 animate-checkmark-pop">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
@@ -105,7 +114,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={isExecuting}
-            className="px-3.5 py-2 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] hover:bg-[#F0F3F7] rounded-[4px] transition cursor-pointer disabled:opacity-40"
+            className="aurix-btn px-3.5 py-2 text-[13px] font-medium text-[#5A6B7B] hover:text-[#0E1B2B] hover:bg-[#F0F3F7] rounded-[4px] transition cursor-pointer disabled:opacity-40"
           >
             Cancel
           </button>
@@ -113,9 +122,9 @@ export default function ConfirmDialog({
             type="button"
             onClick={() => onConfirm(recommendation)}
             disabled={isExecuting}
-            className="px-4 py-2 bg-[#0E1B2B] hover:bg-[#1C2C40] active:bg-[#000000] text-white text-[13px] font-medium rounded-[4px] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="group aurix-btn px-4 py-2 bg-[#0E1B2B] hover:bg-[#1C2C40] active:bg-[#000000] text-white text-[13px] font-medium rounded-[4px] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
           >
-            <Check className="w-3.5 h-3.5" />
+            <Check className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
             <span>Approve & Execute</span>
           </button>
         </div>
