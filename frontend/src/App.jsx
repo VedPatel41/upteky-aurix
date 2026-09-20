@@ -84,15 +84,19 @@ export default function App() {
     try {
       if (source === "custom" && file) {
         const uploadRes = await uploadCrmCsv(file);
+        const actualCount = uploadRes?.rows || uploadRes?.rows_count || rows;
+        setAnalyzedRowCount(actualCount);
         if (uploadRes?.run_id) {
           setRunId(uploadRes.run_id);
-          showToast(`File "${file.name}" uploaded successfully`);
+          showToast(`File "${file.name}" analyzed (${actualCount} leads)`);
         }
       } else {
         const seedRes = await seedSampleData();
+        const actualCount = seedRes?.rows || seedRes?.rows_count || rows;
+        setAnalyzedRowCount(actualCount);
         if (seedRes?.run_id) {
           setRunId(seedRes.run_id);
-          showToast("Sample CRM dataset loaded (312 leads)");
+          showToast(`Sample CRM dataset loaded (${actualCount} leads)`);
         }
       }
     } catch (err) {
@@ -110,9 +114,9 @@ export default function App() {
         getRecommendations(runId),
       ]);
 
-      setMetrics(metricsRes.metrics);
-      setFunnel(metricsRes.funnel);
-      setRecommendations(recsRes.recommendations);
+      setMetrics(metricsRes.metrics || metricsRes);
+      setFunnel(metricsRes.funnel || []);
+      setRecommendations(Array.isArray(recsRes) ? recsRes : (recsRes.recommendations || []));
       setIsAnalyzing(false);
       setCurrentScreen("findings");
       showToast("Diagnostic analysis completed · 3 opportunities found");
@@ -154,13 +158,14 @@ export default function App() {
           },
         }));
 
-        showToast(`Rule ${rec.rule_code} approved · 112 simulated actions queued`);
+        const affected = rec.affected_count || approveRes?.queued_actions || 112;
+        showToast(`Rule ${rec.rule_code} approved · ${affected} simulated actions queued`);
 
         // Fetch impact results immediately for Screen 3
         try {
           const impactRes = await getExecutionImpact(approveRes?.execution_id || 7);
-          setImpactData(impactRes.impact);
-          setExecutionLogs(impactRes.logs);
+          setImpactData(impactRes.impact || impactRes);
+          setExecutionLogs(impactRes.logs || []);
         } catch (impErr) {
           console.error("Impact load error:", impErr);
         }

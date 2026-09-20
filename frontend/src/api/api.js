@@ -1,8 +1,8 @@
 /**
  * AURIX Centralized API Client
  *
- * Switch MOCK to false when integrating with FastAPI backend.
- * All API operations strictly flow through this interface.
+ * Connected to Django REST Framework backend on http://localhost:8000.
+ * Set MOCK = true to activate offline demo safety mode.
  */
 
 import {
@@ -13,8 +13,8 @@ import {
   mockExecutionLogs,
 } from "../data/mockData";
 
-// Toggle mock mode. When false, calls live FastAPI backend.
-export const MOCK = true;
+// Toggle mock mode. Set to false to run live against Django REST Framework API.
+export const MOCK = false;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -49,7 +49,7 @@ async function request(endpoint, options = {}) {
   } catch (err) {
     if (err.name === "TypeError" && err.message.includes("fetch")) {
       throw new Error(
-        `Unable to connect to AURIX Backend at ${API_BASE_URL}. Ensure the FastAPI server is running or switch to Demo Mock Mode.`
+        `Unable to connect to AURIX Django Backend at ${API_BASE_URL}. Ensure 'python manage.py runserver 8000' is active.`
       );
     }
     throw err;
@@ -57,7 +57,18 @@ async function request(endpoint, options = {}) {
 }
 
 /**
- * 1. Seed or Trigger Sample CRM Data Analysis
+ * 1. Health Check
+ * GET /api/health
+ */
+export async function checkHealth() {
+  if (MOCK) {
+    return { status: "ok", service: "AURIX Mock Engine" };
+  }
+  return request("/api/health");
+}
+
+/**
+ * 2. Seed or Trigger Sample CRM Data Analysis
  * POST /api/seed
  */
 export async function seedSampleData() {
@@ -68,13 +79,14 @@ export async function seedSampleData() {
       run_id: "run-312-crm",
       message: "Sample CRM dataset loaded successfully",
       rows_count: 312,
+      rows: 312,
     };
   }
   return request("/api/seed", { method: "POST" });
 }
 
 /**
- * 2. Upload CSV File
+ * 3. Upload CSV File
  * POST /api/upload
  */
 export async function uploadCrmCsv(file) {
@@ -85,6 +97,7 @@ export async function uploadCrmCsv(file) {
       run_id: `run-${Date.now()}`,
       filename: file.name,
       rows_count: 312,
+      rows: 312,
       message: "CSV processed successfully",
     };
   }
@@ -99,7 +112,7 @@ export async function uploadCrmCsv(file) {
 }
 
 /**
- * 3. Fetch Run Metrics & Funnel
+ * 4. Fetch Run Metrics & Funnel
  * GET /api/runs/{id}/metrics
  */
 export async function getRunMetrics(runId = "run-312-crm") {
@@ -110,11 +123,16 @@ export async function getRunMetrics(runId = "run-312-crm") {
       funnel: mockFunnelStages,
     };
   }
-  return request(`/api/runs/${runId}/metrics`);
+  const res = await request(`/api/runs/${runId}/metrics`);
+  return {
+    metrics: res.metrics || res,
+    funnel: res.funnel || [],
+    ...res,
+  };
 }
 
 /**
- * 4. Fetch Recommendations
+ * 5. Fetch Recommendations
  * GET /api/runs/{id}/recommendations
  */
 export async function getRecommendations(runId = "run-312-crm") {
@@ -124,11 +142,12 @@ export async function getRecommendations(runId = "run-312-crm") {
       recommendations: mockRecommendations,
     };
   }
-  return request(`/api/runs/${runId}/recommendations`);
+  const res = await request(`/api/runs/${runId}/recommendations`);
+  return Array.isArray(res) ? { recommendations: res } : res;
 }
 
 /**
- * 5. Approve Recommendation
+ * 6. Approve Recommendation
  * POST /api/recommendations/{id}/approve
  */
 export async function approveRecommendation(recId, payload = {}) {
@@ -150,7 +169,7 @@ export async function approveRecommendation(recId, payload = {}) {
 }
 
 /**
- * 6. Reject Recommendation
+ * 7. Reject Recommendation
  * POST /api/recommendations/{id}/reject
  */
 export async function rejectRecommendation(recId, reason = "") {
@@ -170,7 +189,7 @@ export async function rejectRecommendation(recId, reason = "") {
 }
 
 /**
- * 7. Fetch Execution Impact & Simulated Results
+ * 8. Fetch Execution Impact & Simulated Results
  * GET /api/executions/{id}/impact
  */
 export async function getExecutionImpact(executionId = 7) {
@@ -181,5 +200,10 @@ export async function getExecutionImpact(executionId = 7) {
       logs: mockExecutionLogs,
     };
   }
-  return request(`/api/executions/${executionId}/impact`);
+  const res = await request(`/api/executions/${executionId}/impact`);
+  return {
+    impact: res.impact || res,
+    logs: res.logs || [],
+    ...res,
+  };
 }

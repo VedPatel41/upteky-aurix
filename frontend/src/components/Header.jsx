@@ -132,9 +132,9 @@ export default function Header({ currentScreen, onNavigate, onReset }) {
                 ? "bg-[#F4F8F6] text-[#1F9D6B] border-[#D5EADF] hover:bg-[#EBF5F0]"
                 : "bg-[#EBF3FF] text-[#0043CE] border-[#D0E2FF] hover:bg-[#E0EEFF]"
             }`}
-            title={MOCK ? "Offline Demo Mode: High-Reliability Hackathon Fallback" : "Connected to FastAPI Live Backend"}
+            title={MOCK ? "Offline Demo Mode: High-Reliability Hackathon Fallback" : "Connected to Django REST Backend on port 8000"}
           >
-            {MOCK ? "Demo Mock" : "FastAPI"}
+            {MOCK ? "Demo Mock" : "Django API"}
           </div>
         </div>
       </div>
