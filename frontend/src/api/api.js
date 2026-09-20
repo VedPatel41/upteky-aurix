@@ -1,28 +1,12 @@
 /**
  * AURIX Centralized API Client
  *
- * Connected to Django REST Framework backend on http://localhost:8000.
- * Includes JWT Authentication, auto-refresh, and robust error normalization.
- * Set MOCK = true to activate offline demo safety mode.
+ * Connected exclusively to Django REST Framework backend on http://localhost:8000.
+ * Pure data-driven implementation with JWT session management, automatic refresh,
+ * and robust enterprise error handling.
  */
-
-import {
-  mockSummaryMetrics,
-  mockFunnelStages,
-  mockRecommendations,
-  mockImpactData,
-  mockExecutionLogs,
-} from "../data/mockData";
-
-// Toggle mock mode. Set to false to run live against Django REST Framework API.
-export const MOCK = false;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-
-/**
- * Helper to simulate network latency in mock mode
- */
-const delay = (ms = 350) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Token Storage Helpers
@@ -91,7 +75,7 @@ async function request(endpoint, options = {}, isRetry = false) {
             const tokenData = await refreshRes.json();
             if (tokenData.access) {
               setTokens(tokenData.access, tokenData.refresh || refreshToken);
-              // Retry request with new token
+              // Retry original request with freshly acquired token
               return request(endpoint, options, true);
             }
           }
@@ -124,7 +108,7 @@ async function request(endpoint, options = {}, isRetry = false) {
 }
 
 // =============================================================================
-// AUTHENTICATION CLIENT APIs
+// AUTHENTICATION APIs
 // =============================================================================
 
 /**
@@ -132,13 +116,6 @@ async function request(endpoint, options = {}, isRetry = false) {
  * POST /api/auth/signup
  */
 export async function signupUser({ name, email, password, confirm_password }) {
-  if (MOCK) {
-    await delay(350);
-    const mockUser = { id: 99, username: email.split("@")[0], email, name };
-    setTokens("mock_access_token", "mock_refresh_token", mockUser);
-    return { success: true, user: mockUser };
-  }
-
   const res = await request("/api/auth/signup", {
     method: "POST",
     body: JSON.stringify({ name, email, password, confirm_password }),
@@ -155,18 +132,6 @@ export async function signupUser({ name, email, password, confirm_password }) {
  * POST /api/auth/login
  */
 export async function loginUser({ email, password }) {
-  if (MOCK) {
-    await delay(300);
-    const mockUser = {
-      id: 1,
-      username: email.split("@")[0] || "ved",
-      email: email || "ved@aurix.local",
-      name: "Ved Prakash",
-    };
-    setTokens("mock_access_token", "mock_refresh_token", mockUser);
-    return { success: true, user: mockUser };
-  }
-
   const res = await request("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
@@ -183,11 +148,6 @@ export async function loginUser({ email, password }) {
  * GET /api/auth/me
  */
 export async function getCurrentUser() {
-  if (MOCK) {
-    const u = getStoredUser();
-    return { user: u || { id: 1, username: "ved", email: "ved@aurix.local", name: "Ved Prakash" } };
-  }
-
   const token = getStoredToken();
   if (!token) throw new Error("No active session found");
   return request("/api/auth/me");
@@ -199,14 +159,14 @@ export async function getCurrentUser() {
  */
 export async function logoutUser() {
   const refresh = getStoredRefreshToken();
-  if (!MOCK && refresh) {
+  if (refresh) {
     try {
       await request("/api/auth/logout", {
         method: "POST",
         body: JSON.stringify({ refresh }),
       });
     } catch {
-      // Non-fatal if offline
+      // Non-fatal network disconnect
     }
   }
   clearAuth();
@@ -222,9 +182,6 @@ export async function logoutUser() {
  * GET /api/health
  */
 export async function checkHealth() {
-  if (MOCK) {
-    return { status: "ok", service: "AURIX Mock Engine" };
-  }
   return request("/api/health");
 }
 
@@ -233,16 +190,6 @@ export async function checkHealth() {
  * POST /api/seed
  */
 export async function seedSampleData() {
-  if (MOCK) {
-    await delay(200);
-    return {
-      success: true,
-      run_id: "run-312-crm",
-      message: "Sample CRM dataset loaded successfully",
-      rows_count: 312,
-      rows: 312,
-    };
-  }
   return request("/api/seed", { method: "POST" });
 }
 
@@ -251,18 +198,6 @@ export async function seedSampleData() {
  * POST /api/upload
  */
 export async function uploadCrmCsv(file) {
-  if (MOCK) {
-    await delay(400);
-    return {
-      success: true,
-      run_id: `run-${Date.now()}`,
-      filename: file.name,
-      rows_count: 312,
-      rows: 312,
-      message: "CSV processed successfully",
-    };
-  }
-
   const formData = new FormData();
   formData.append("file", file);
 
@@ -276,14 +211,7 @@ export async function uploadCrmCsv(file) {
  * 8. Fetch Run Metrics & Funnel
  * GET /api/runs/{id}/metrics
  */
-export async function getRunMetrics(runId = "run-312-crm") {
-  if (MOCK) {
-    await delay(250);
-    return {
-      metrics: mockSummaryMetrics,
-      funnel: mockFunnelStages,
-    };
-  }
+export async function getRunMetrics(runId) {
   const res = await request(`/api/runs/${runId}/metrics`);
   return {
     metrics: res.metrics || res,
@@ -296,13 +224,7 @@ export async function getRunMetrics(runId = "run-312-crm") {
  * 9. Fetch Recommendations
  * GET /api/runs/{id}/recommendations
  */
-export async function getRecommendations(runId = "run-312-crm") {
-  if (MOCK) {
-    await delay(250);
-    return {
-      recommendations: mockRecommendations,
-    };
-  }
+export async function getRecommendations(runId) {
   const res = await request(`/api/runs/${runId}/recommendations`);
   return Array.isArray(res) ? { recommendations: res } : res;
 }
@@ -312,17 +234,6 @@ export async function getRecommendations(runId = "run-312-crm") {
  * POST /api/recommendations/{id}/approve
  */
 export async function approveRecommendation(recId, payload = {}) {
-  if (MOCK) {
-    await delay(300);
-    return {
-      success: true,
-      recommendation_id: recId,
-      execution_id: 7,
-      status: "approved",
-      queued_actions: 112,
-      message: "Workflow execution started",
-    };
-  }
   return request(`/api/recommendations/${recId}/approve`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -334,15 +245,6 @@ export async function approveRecommendation(recId, payload = {}) {
  * POST /api/recommendations/{id}/reject
  */
 export async function rejectRecommendation(recId, reason = "") {
-  if (MOCK) {
-    await delay(200);
-    return {
-      success: true,
-      recommendation_id: recId,
-      status: "rejected",
-      reason: reason || "User declined proposed automation",
-    };
-  }
   return request(`/api/recommendations/${recId}/reject`, {
     method: "POST",
     body: JSON.stringify({ reason }),
@@ -353,14 +255,7 @@ export async function rejectRecommendation(recId, reason = "") {
  * 12. Fetch Execution Impact & Simulated Results
  * GET /api/executions/{id}/impact
  */
-export async function getExecutionImpact(executionId = 7) {
-  if (MOCK) {
-    await delay(300);
-    return {
-      impact: mockImpactData,
-      logs: mockExecutionLogs,
-    };
-  }
+export async function getExecutionImpact(executionId) {
   const res = await request(`/api/executions/${executionId}/impact`);
   return {
     impact: res.impact || res,

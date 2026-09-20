@@ -12,7 +12,6 @@ import Toast from "./components/Toast";
 import StartupSplash from "./components/StartupSplash";
 import AuthScreen from "./components/AuthScreen";
 import {
-  MOCK,
   getCurrentUser,
   logoutUser,
   seedSampleData,

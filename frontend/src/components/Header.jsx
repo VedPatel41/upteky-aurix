@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { RotateCcw, ArrowRight, Check, Sparkles, LogOut, User } from "lucide-react";
-import { MOCK } from "../api/api";
 
 /**
  * Header Component (Section 3 & 32)
@@ -128,14 +127,10 @@ export default function Header({ currentScreen, onNavigate, onReset, currentUser
           )}
 
           <div
-            className={`text-[11px] font-medium px-2 py-0.5 rounded-[4px] border transition-all duration-200 ${
-              MOCK
-                ? "bg-[#F4F8F6] text-[#1F9D6B] border-[#D5EADF] hover:bg-[#EBF5F0]"
-                : "bg-[#EBF3FF] text-[#0043CE] border-[#D0E2FF] hover:bg-[#E0EEFF]"
-            }`}
-            title={MOCK ? "Offline Demo Mode: High-Reliability Hackathon Fallback" : "Connected to Django REST Backend on port 8000"}
+            className="text-[11px] font-medium px-2 py-0.5 rounded-[4px] border border-[#D0E2FF] bg-[#EBF3FF] text-[#0043CE] hover:bg-[#E0EEFF] transition-all duration-200"
+            title="Connected to Live Django REST Backend on port 8000"
           >
-            {MOCK ? "Demo Mock" : "Django API"}
+            Django API
           </div>
 
           {currentUser && (
