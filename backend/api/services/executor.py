@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 from api.models import Recommendation, Execution, ExecutionItem, Lead
 
@@ -12,41 +13,44 @@ SAMPLE_LOG_COMPANIES = [
 
 def execute_recommendation(recommendation_id):
     """
-    Simulates execution of an approved automation recommendation.
+    Simulates execution of an approved automation recommendation atomically.
     Creates Execution and ExecutionItem records for real audit telemetry.
+    Guarantees state integrity and prevents duplicate executions.
     """
-    rec = Recommendation.objects.get(id=recommendation_id)
-    if rec.status == "approved":
-        existing = Execution.objects.filter(recommendation=rec).last()
-        if existing:
-            return existing.id
+    with transaction.atomic():
+        rec = Recommendation.objects.select_for_update().get(id=recommendation_id)
+        if rec.status == "approved":
+            raise ValueError("Recommendation is already approved.")
+        if rec.status == "rejected":
+            raise ValueError("Cannot approve a rejected recommendation.")
 
-    now = timezone.now()
-    execution = Execution.objects.create(
-        recommendation=rec,
-        started_at=now,
-        finished_at=now,
-        items_count=rec.affected_count or 112,
-    )
-
-    # Get sample leads from database or realistic fallback list
-    leads = list(Lead.objects.filter(stage__in=["qualified", "contacted"])[:5])
-    items = []
-
-    for i, (comp_name, email) in enumerate(SAMPLE_LOG_COMPANIES):
-        lead_obj = leads[i] if i < len(leads) else None
-        item = ExecutionItem(
-            execution=execution,
-            lead=lead_obj,
-            action="Follow-up simulated",
-            simulated_at=now,
-            note=f"{comp_name} — {email}",
+        now = timezone.now()
+        item_count = rec.affected_count if rec.affected_count > 0 else 5
+        execution = Execution.objects.create(
+            recommendation=rec,
+            started_at=now,
+            finished_at=now,
+            items_count=item_count,
         )
-        items.append(item)
 
-    ExecutionItem.objects.bulk_create(items)
+        leads = list(Lead.objects.filter(stage__in=["qualified", "contacted"])[:5])
+        items = []
 
-    rec.status = "approved"
-    rec.save(update_fields=["status"])
+        for i, (comp_name, email) in enumerate(SAMPLE_LOG_COMPANIES):
+            lead_obj = leads[i] if i < len(leads) else None
+            company_display = lead_obj.company if lead_obj and lead_obj.company else comp_name
+            item = ExecutionItem(
+                execution=execution,
+                lead=lead_obj,
+                action="Follow-up simulated",
+                simulated_at=now,
+                note=f"{company_display} — {email}",
+            )
+            items.append(item)
 
-    return execution.id
+        ExecutionItem.objects.bulk_create(items)
+
+        rec.status = "approved"
+        rec.save(update_fields=["status"])
+
+        return execution.id

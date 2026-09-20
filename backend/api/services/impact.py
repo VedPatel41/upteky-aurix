@@ -3,44 +3,41 @@ from api.models import Execution, ExecutionItem
 
 def calculate_execution_impact(execution_id):
     """
-    Computes quantified ROI and capacity metrics from real pipeline parameters:
-    - hours_saved_per_month
-    - recovered_leads
-    - revenue_opportunity_inr
+    Computes quantified ROI and capacity metrics strictly from dataset parameters:
+    - hours_saved_per_month = (affected * 12 / 60) * (30 / days_in_dataset)
+    - recovered_leads = affected * 0.35
+    - revenue_opportunity_inr = recovered_leads * avg_deal_value * win_rate
     """
     execution = Execution.objects.select_related("recommendation__run").get(id=execution_id)
     rec = execution.recommendation
     run = rec.run
     metrics = run.metrics_json or {}
 
-    affected = rec.affected_count or 112
-    days_in_dataset = metrics.get("dataset_duration_days", 90.0) or 90.0
-    avg_deal_value = metrics.get("average_deal_value", 165000.0) or 165000.0
-    win_rate = metrics.get("win_rate", 0.0705) or 0.0705
+    affected = rec.affected_count or 0
+    days_in_dataset = metrics.get("dataset_duration_days") or 90.0
+    avg_deal_value = metrics.get("average_deal_value") or 165000.0
+    win_rate = metrics.get("win_rate") or 0.0705
 
-    # Frozen Constants
+    # Benchmark Constants
     MANUAL_MIN_PER_LEAD = 12
     UPLIFT_RATE = 0.35
-    month_factor = 30.0 / max(15.0, days_in_dataset)
+
+    # Prevent division by zero
+    safe_days = max(1.0, float(days_in_dataset))
+    month_factor = 30.0 / safe_days
 
     # 1. Hours saved per month
-    raw_hours_saved = (affected * MANUAL_MIN_PER_LEAD / 60.0) * month_factor
-    # If standard 112 leads dataset, normalized ~ 42.0h
-    hours_saved_per_month = round(raw_hours_saved if raw_hours_saved > 20 else 42.0, 1)
+    hours_saved_per_month = round((affected * MANUAL_MIN_PER_LEAD / 60.0) * month_factor, 1)
 
     # 2. Recovered leads
-    recovered_leads = round(affected * UPLIFT_RATE)
+    recovered_leads = int(round(affected * UPLIFT_RATE))
 
     # 3. Revenue opportunity in INR
-    # recovered_leads * avg_deal_conversion_value
-    conversion_unit_value = avg_deal_value * win_rate
-    if conversion_unit_value < 2000 or conversion_unit_value > 25000:
-        conversion_unit_value = 6153.85
-    raw_revenue = recovered_leads * conversion_unit_value
-    revenue_opportunity_inr = int(round(raw_revenue / 1000.0) * 1000)
+    raw_revenue = recovered_leads * float(avg_deal_value) * float(win_rate)
+    revenue_opportunity_inr = int(round(raw_revenue))
 
-    before_val = rec.metric_before if rec.metric_before else 18.4
-    after_val = rec.metric_after_target if rec.metric_after_target else 2.0
+    before_val = rec.metric_before if rec.metric_before is not None else 0.0
+    after_val = rec.metric_after_target if rec.metric_after_target is not None else 0.0
 
     impact_data = {
         "execution_id": execution.id,
@@ -65,7 +62,7 @@ def calculate_execution_impact(execution_id):
     # Fetch execution log items
     items = ExecutionItem.objects.filter(execution=execution).order_by("id")
     logs = []
-    
+
     fallback_companies = [
         ("Shah Industries", "rajesh.shah@shahindustries.in"),
         ("Patel Manufacturing", "vimal.p@patelmanuf.com"),

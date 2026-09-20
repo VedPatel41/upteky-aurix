@@ -43,21 +43,20 @@ def analyze_leads():
     df = pd.DataFrame(data)
     total_leads = len(df)
 
-    # Response time calculation for qualified pipeline
-    qualified_pipeline_stages = ["qualified", "quoted", "won"]
-    df_qual = df[df["stage"].isin(qualified_pipeline_stages)]
+    # Response time calculation for qualified & contacted leads
+    target_stages = ["contacted", "qualified", "quoted", "won"]
+    df_contacted = df[df["stage"].isin(target_stages)]
     
-    # Calculate response time among delayed qualified leads or average
-    qual_with_lag = df_qual[df_qual["lag_hours"].notnull()]
+    qual_with_lag = df_contacted[df_contacted["lag_hours"].notnull()]
     if not qual_with_lag.empty:
-        # Calculate mean for delayed leads or overall qualified leads
+        # If there are delayed leads (>4h), compute response lag among them or general average
         high_lag = qual_with_lag[qual_with_lag["lag_hours"] > 4.0]
         if not high_lag.empty:
             avg_response_num = round(float(high_lag["lag_hours"].mean()), 1)
         else:
             avg_response_num = round(float(qual_with_lag["lag_hours"].mean()), 1)
     else:
-        avg_response_num = 18.4
+        avg_response_num = 0.0
 
     qualified_count = len(df[df["stage"].isin(["qualified", "quoted", "won"])])
 

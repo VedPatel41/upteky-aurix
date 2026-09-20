@@ -321,10 +321,16 @@ class ApproveRecommendationView(APIView):
         if not request.user.is_superuser and rec.run.user and rec.run.user != request.user:
             return Response({"detail": "Access denied to this recommendation."}, status=status.HTTP_403_FORBIDDEN)
 
-        if rec.status == "rejected":
-            return Response({"detail": "This recommendation was previously rejected. Please reconsider it first."}, status=status.HTTP_400_BAD_REQUEST)
+        if rec.status == "approved":
+            return Response({"detail": "Recommendation is already approved."}, status=status.HTTP_409_CONFLICT)
 
-        execution_id = execute_recommendation(rec.id)
+        if rec.status == "rejected":
+            return Response({"detail": "This recommendation was previously rejected. Cannot approve a rejected recommendation."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            execution_id = execute_recommendation(rec.id)
+        except ValueError as ve:
+            return Response({"detail": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({
             "success": True,
@@ -347,6 +353,9 @@ class RejectRecommendationView(APIView):
         rec = get_object_or_404(Recommendation.objects.select_related("run"), id=rec_id)
         if not request.user.is_superuser and rec.run.user and rec.run.user != request.user:
             return Response({"detail": "Access denied to this recommendation."}, status=status.HTTP_403_FORBIDDEN)
+
+        if rec.status == "approved":
+            return Response({"detail": "Cannot reject an already approved recommendation."}, status=status.HTTP_400_BAD_REQUEST)
 
         rec.status = "rejected"
         rec.save(update_fields=["status"])
